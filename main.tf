@@ -1,0 +1,131 @@
+############################
+# IAM Role for CodeBuild
+############################
+data "aws_iam_policy_document" "codebuild_assume" {
+  statement {
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["codebuild.amazonaws.com"]
+    }
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+resource "aws_iam_role" "codebuild_role" {
+  name               = "scanner-bpl-codebuild-role"
+  assume_role_policy = data.aws_iam_policy_document.codebuild_assume.json
+}
+
+# Inline policy for CodeBuild to call SageMaker, S3, Logs, ECR (if needed)
+data "aws_iam_policy_document" "codebuild_policy" {
+  statement {
+    sid    = "SageMakerS3Logs"
+    effect = "Allow"
+    actions = [ 
+      "sagemaker:InvokeEndpoint",
+       "logs:CreateLogGroup",
+       "logs:CreateLogStream",
+       "logs:PutLogEvents"
+    ]   
+    resources = "*"
+  }
+}
+
+resource "aws_iam_role_policy" "codebuild_policy_attach" {
+  name   = "scanner-bpl-codebuild-policy"
+  role   = aws_iam_role.codebuild_role.id
+  policy = data.aws_iam_policy_document.codebuild_policy.json
+}
+
+resource "aws_sagemaker_model" "scanner" {
+  name               = "credential-scanner-model"
+  execution_role_arn = aws_iam_role.sagemaker_execution.arn
+
+  primary_container {
+    image          = "683313688378.dkr.ecr.us-east-1.amazonaws.com/sagemaker-scikit-learn:1.2-1-cpu-py3"
+    model_data_url = var.model_artifact_s3
+  }
+}
+
+resource "aws_sagemaker_endpoint_configuration" "scanner" {
+  name = "credential-scanner-config"
+
+  production_variants {
+    model_name             = aws_sagemaker_model.scanner.name
+    variant_name           = "AllTraffic"
+    instance_type          = "ml.m5.large"
+    initial_instance_count = 1
+  }
+}
+
+resource "aws_sagemaker_endpoint" "scanner" {
+  name                 = "credential-scanner-endpoint"
+  endpoint_config_name = aws_sagemaker_endpoint_configuration.scanner.name
+}
+
+resource "aws_codebuild_project" "scan" {
+  name          = "credential-scan-build"
+  service_role = aws_iam_role.codebuild_scan.arn
+
+  artifacts { type = "CODEPIPELINE" }
+
+  environment {
+    image        = "aws/codebuild/standard:7.0"
+    compute_type = "BUILD_GENERAL1_SMALL"
+    type         = "LINUX_CONTAINER"
+
+    environment_variable {
+      name  = "SAGEMAKER_ENDPOINT_NAME"
+      value = "credential-scanner-endpoint"
+    }
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "buildspec-scan.yml"
+  }
+}
+
+resource "aws_codepipeline" "code_scan" {
+  name     = "code-scan-pipeline"
+  role_arn = aws_iam_role.codepipeline.arn
+
+  artifact_store {
+    location = var.artifact_bucket_name
+    type     = "S3"
+  }
+
+  stage {
+        name = "Source"
+        action {
+          name             = "Source"
+          category         = "Source"
+          owner            = "AWS"
+          provider         = "CodeStarSourceConnection"
+          version          = "1"
+          output_artifacts = ["source_output"]
+          configuration = {
+            ConnectionArn    = "arn:aws:codeconnections:us-east-1:361509912577:connection/09caa1e3-a6ab-45df-be90-10c14777466b"
+            FullRepositoryId = "gitbidyut/code-scanner-job-bpl" # e.g., "myuser/my-repo"
+            #RepositoryName = aws_codecommit_repository.app_repo.repository_name
+            BranchName     = "main"
+          }
+        }
+      }
+
+  stage {
+    name = "Scan"
+    action {
+      name            = "ScanCode"
+      category        = "Build"
+      owner           = "AWS"
+      provider        = "CodeBuild"
+      input_artifacts = ["source_output"]
+      version = "1"
+      configuration = {
+        ProjectName = aws_codebuild_project.scan.name
+      }
+    }
+  }
+}
