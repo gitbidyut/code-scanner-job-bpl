@@ -18,33 +18,48 @@ resource "aws_iam_role" "codebuild_role" {
 }
 
 # Inline policy for CodeBuild to call SageMaker, S3, Logs, ECR (if needed)
+# data "aws_iam_policy_document" "codebuild_policy" {
+#   statement {
+#     sid    = "SageMakerS3Logs"
+#     effect = "Allow"
+#     actions = [ 
+#       "sagemaker:InvokeEndpoint",
+#        "logs:CreateLogGroup",
+#        "logs:CreateLogStream",
+#        "logs:PutLogEvents"
+#     ]   
+#     resources = "*"
+#   }
+# }
 data "aws_iam_policy_document" "codebuild_policy" {
   statement {
     sid    = "SageMakerS3Logs"
     effect = "Allow"
-    actions = [ 
-      "sagemaker:InvokeEndpoint",
+    actions = [
+       "sagemaker:InvokeEndpoint",
        "logs:CreateLogGroup",
        "logs:CreateLogStream",
        "logs:PutLogEvents"
-    ]   
-    resources = "*"
+    ]
+    resources = ["*"]
   }
 }
-
 resource "aws_iam_role_policy" "codebuild_policy_attach" {
-  name   = "scanner-bpl-codebuild-policy"
+  name   = "scanner-bpl-codebuild-policy1"
   role   = aws_iam_role.codebuild_role.id
   policy = data.aws_iam_policy_document.codebuild_policy.json
 }
 
 resource "aws_sagemaker_model" "scanner" {
-  name               = "credential-scanner-model"
-  execution_role_arn = aws_iam_role.sagemaker_execution.arn
+  name               = "credential-scanner-model-v1"
+  execution_role_arn = var.sagemaker_execution_role
 
   primary_container {
-    image          = "683313688378.dkr.ecr.us-east-1.amazonaws.com/sagemaker-scikit-learn:1.2-1-cpu-py3"
+    image          = var.sklearn_image_uri
     model_data_url = var.model_artifact_s3
+    environment = {
+      SAGEMAKER_PROGRAM = "inference.py"
+    }
   }
 }
 
@@ -66,7 +81,7 @@ resource "aws_sagemaker_endpoint" "scanner" {
 
 resource "aws_codebuild_project" "scan" {
   name          = "credential-scan-build"
-  service_role = aws_iam_role.codebuild_scan.arn
+  service_role = aws_iam_role.codebuild_role.arn
 
   artifacts { type = "CODEPIPELINE" }
 
@@ -89,7 +104,7 @@ resource "aws_codebuild_project" "scan" {
 
 resource "aws_codepipeline" "code_scan" {
   name     = "code-scan-pipeline"
-  role_arn = aws_iam_role.codepipeline.arn
+  role_arn = "arn:aws:iam::361509912577:role/scanner-bpl-codepipeline-role"
 
   artifact_store {
     location = var.artifact_bucket_name
@@ -106,7 +121,7 @@ resource "aws_codepipeline" "code_scan" {
           version          = "1"
           output_artifacts = ["source_output"]
           configuration = {
-            ConnectionArn    = "arn:aws:codeconnections:us-east-1:361509912577:connection/09caa1e3-a6ab-45df-be90-10c14777466b"
+            ConnectionArn    = var.codestar_connection_con
             FullRepositoryId = "gitbidyut/code-scanner-job-bpl" # e.g., "myuser/my-repo"
             #RepositoryName = aws_codecommit_repository.app_repo.repository_name
             BranchName     = "main"
