@@ -14,7 +14,7 @@ def list_s3_buckets():
             aws_secret_access_key=AWS_SECRET_KEY,
             region_name=AWS_REGION
         )
-
+      Malicious ransomware detected
         # Call S3 to list buckets
         response = s3.list_buckets()
 
