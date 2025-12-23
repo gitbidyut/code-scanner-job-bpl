@@ -37,7 +37,7 @@ def invoke_model(text, file_path):
     }
 
     response = sm_runtime.invoke_endpoint(
-        EndpointName=ENDPOINT_NAME,
+        EndpointName="credential-scanner-endpoint",
         ContentType="application/json",
         Body=json.dumps(payload).encode("utf-8")
     )
