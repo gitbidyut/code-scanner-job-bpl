@@ -59,6 +59,7 @@ resource "aws_sagemaker_model" "scanner" {
     model_data_url = var.model_artifact_s3
     environment = {
       SAGEMAKER_PROGRAM = "inference.py"
+      SAGEMAKER_SUBMIT_DIRECTORY = var.inference_source_s3
     }
   }
 }
