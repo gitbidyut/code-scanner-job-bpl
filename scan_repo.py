@@ -65,7 +65,7 @@ def invoke_endpoint(client, text: str) -> dict:
 # Main scan logic
 # -----------------------------
 def main():
-    print("🔍 Starting credential scan...")
+    print("Starting credential scan...")
 
     sm_runtime = boto3.client("sagemaker-runtime")
     violations = []
@@ -74,9 +74,9 @@ def main():
         for name in files:
             path = os.path.join(root, name)
 
-            if should_skip_file(path):
-                print(f"ℹ️ Skipping {path} (safe extension)")
-                continue
+            # if should_skip_file(path):
+            #     print(f"Skipping {path} (safe extension)")
+            #     continue
 
             try:
                 if os.path.getsize(path) > MAX_FILE_SIZE:
