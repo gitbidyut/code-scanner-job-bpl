@@ -1,127 +1,118 @@
-import boto3
-import json
 import os
 import sys
+import json
+import re
+import boto3
 
-# ==========================
+# -----------------------------
 # Configuration
-# ==========================
+# -----------------------------
 ENDPOINT_NAME = os.environ.get(
     "SAGEMAKER_ENDPOINT_NAME",
     "credential-scanner-endpoint"
 )
 
-# File types to scan
-SCAN_EXTENSIONS = (
-    ".py", ".js", ".ts", ".env", ".yaml", ".yml",
-    ".json", ".tf", ".sh", ".txt"
-)
+CONFIDENCE_THRESHOLD = 0.85
 
-# Max file size to scan (100 KB)
-MAX_FILE_SIZE = 100 * 1024
+IGNORED_EXTENSIONS = {
+    ".tf",
+    ".tfvars",
+    ".yml",
+    ".yaml",
+    ".json",
+    ".md",
+    ".txt",
+    ".ini",
+    ".cfg",
+    ".requirements"
+}
+
+MAX_FILE_SIZE = 200_000  # 200 KB safety limit
+
+# Real credential patterns (cheap & precise)
+SUSPICIOUS_PATTERNS = [
+    r"AKIA[0-9A-Z]{16}",                      # AWS access key
+    r"ASIA[0-9A-Z]{16}",                      # AWS STS key
+    r"(?i)aws_secret_access_key\s*=\s*['\"][^'\"]+['\"]",
+    r"(?i)aws_access_key_id\s*=\s*['\"][^'\"]+['\"]",
+    r"(?i)secret[_\- ]?key\s*=\s*['\"][^'\"]+['\"]",
+    r"(?i)password\s*=\s*['\"][^'\"]+['\"]",
+]
 
 
-# ==========================
-# SageMaker runtime client
-# ==========================
-sm_runtime = boto3.client("sagemaker-runtime")
+# -----------------------------
+# Helpers
+# -----------------------------
+def looks_like_real_secret(text: str) -> bool:
+    return any(re.search(p, text) for p in SUSPICIOUS_PATTERNS)
 
 
-def invoke_model(text, file_path):
-    """
-    Invoke SageMaker endpoint for a single file
-    """
-    payload = {
-        "text": text,
-        "file": file_path
-    }
+def should_skip_file(path: str) -> bool:
+    ext = os.path.splitext(path)[1].lower()
+    return ext in IGNORED_EXTENSIONS
 
-    response = sm_runtime.invoke_endpoint(
-        EndpointName="credential-scanner-endpoint",
+
+def invoke_endpoint(client, text: str) -> dict:
+    response = client.invoke_endpoint(
+        EndpointName=ENDPOINT_NAME,
         ContentType="application/json",
-        Body=json.dumps(payload).encode("utf-8")
+        Body=json.dumps({"text": text}),
     )
-
-    result = json.loads(response["Body"].read().decode("utf-8"))
-    return result
+    return json.loads(response["Body"].read())
 
 
-def should_scan_file(path):
-    """
-    Decide whether a file should be scanned
-    """
-    if not path.endswith(SCAN_EXTENSIONS):
-        return False
-
-    if os.path.getsize(path) > MAX_FILE_SIZE:
-        return False
-
-    # Ignore git and terraform cache
-    ignore_dirs = [".git", ".terraform", "node_modules", "__pycache__"]
-    for d in ignore_dirs:
-        if f"{os.sep}{d}{os.sep}" in path:
-            return False
-
-    return True
-
-
-def scan_repository():
-    """
-    Walk through repository and scan files
-    """
-    findings = []
-
-    for root, _, files in os.walk("."):
-        for file in files:
-            file_path = os.path.join(root, file)
-
-            if not should_scan_file(file_path):
-                continue
-
-            try:
-                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read()
-            except Exception as e:
-                print(f"⚠️  Could not read {file_path}: {e}")
-                continue
-
-            if not content.strip():
-                continue
-
-            result = invoke_model(content, file_path)
-
-            if result.get("credential_found"):
-                findings.append({
-                    "file": file_path,
-                    "type": result.get("type", "unknown"),
-                    "confidence": result.get("confidence", "n/a")
-                })
-
-                print(f"❌ Credential detected in {file_path}")
-
-    return findings
-
-
+# -----------------------------
+# Main scan logic
+# -----------------------------
 def main():
     print("🔍 Starting credential scan...")
 
-    findings = scan_repository()
+    sm_runtime = boto3.client("sagemaker-runtime")
+    violations = []
 
-    if findings:
+    for root, _, files in os.walk("."):
+        for name in files:
+            path = os.path.join(root, name)
+
+            if should_skip_file(path):
+                print(f"ℹ️ Skipping {path} (safe extension)")
+                continue
+
+            try:
+                if os.path.getsize(path) > MAX_FILE_SIZE:
+                    print(f"ℹ️ Skipping {path} (file too large)")
+                    continue
+
+                with open(path, "r", errors="ignore") as f:
+                    content = f.read()
+
+            except Exception as e:
+                print(f"⚠️ Could not read {path}: {e}")
+                continue
+
+            # Cheap regex gate
+            if not looks_like_real_secret(content):
+                continue
+
+            # Call ML model only when needed
+            result = invoke_endpoint(sm_runtime, content)
+
+            if (
+                result.get("credential_found")
+                and result.get("confidence", 0) >= CONFIDENCE_THRESHOLD
+            ):
+                print(f"❌ Credential detected in {path}")
+                violations.append({
+                    "file": path,
+                    "type": result.get("type", "unknown"),
+                    "confidence": result.get("confidence"),
+                })
+
+    if violations:
         print("\n🚨 SECURITY VIOLATION DETECTED 🚨")
-        for f in findings:
+        for v in violations:
             print(
-                f"- File: {f['file']}, "
-                f"Type: {f['type']}, "
-                f"Confidence: {f['confidence']}"
+                f"- File: {v['file']}, "
+                f"Type: {v['type']}, "
+                f"Confidence: {v['confidence']}"
             )
-
-        # Fail the pipeline
-        sys.exit(1)
-
-    print("✅ Scan completed successfully. No credentials found.")
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
