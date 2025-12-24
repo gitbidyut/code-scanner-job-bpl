@@ -17,12 +17,13 @@ def scan_file(filepath):
         content = f.read()
 
     response = runtime.invoke_endpoint(
-        EndpointName=ENDPOINT_NAME,
-        ContentType="text/plain",
-        Body=content.encode("utf-8")
-    )
+    EndpointName=ENDPOINT_NAME,
+    ContentType="text/plain",
+    Accept="application/json",
+    Body=content.encode("utf-8")
+)
 
-    result = json.loads(response["Body"].read().decode())
+    result = json.loads(response["Body"].read().decode("utf-8"))
     return result["prediction"], result["confidence"]
 
 def main():
