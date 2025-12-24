@@ -12,7 +12,7 @@ def scan_text(text):
     EndpointName=ENDPOINT,
     ContentType="application/octet-stream",
     Accept="application/json",
-    Body=content.encode("utf-8")
+    Body=json.dumps({"text": text})
     )
     return json.loads(response["Body"].read())
 
