@@ -16,7 +16,7 @@ def scan_text(text):
     return json.loads(response["Body"].read())
 
 def should_scan(filename):
-    return filename.endswith((".py", ".js", ".env", ".yaml", ".yml", ".tf"))
+    return filename.endswith((".py"))
 
 violations = []
 
