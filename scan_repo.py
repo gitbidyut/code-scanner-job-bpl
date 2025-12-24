@@ -1,53 +1,50 @@
 import os
 import sys
 import json
-import joblib
+import boto3
 
-MODEL_DIR = "/opt/ml/model" if os.path.exists("/opt/ml/model") else "./model"
-REPO_DIR = os.getcwd()   # CodeBuild working directory
+ENDPOINT_NAME = "credential-scanner-endpoint"
 THRESHOLD = 0.80
+REGION = "us-east-1"
 
-print("🔍 Starting credential scan...")
-print(f"📂 Scanning directory: {REPO_DIR}")
+runtime = boto3.client("sagemaker-runtime", region_name=REGION)
 
-def load_model():
-    print("📦 Loading model...")
-    vectorizer = joblib.load(os.path.join(MODEL_DIR, "vectorizer.joblib"))
-    model = joblib.load(os.path.join(MODEL_DIR, "model.joblib"))
-    return vectorizer, model
+print("🔍 Starting credential scan using SageMaker endpoint...")
+print(f"📡 Endpoint: {ENDPOINT_NAME}")
 
-def scan_file(filepath, vectorizer, model):
+def scan_file(filepath):
     with open(filepath, "r", errors="ignore") as f:
         content = f.read()
 
-    X = vectorizer.transform([content])
-    prob = model.predict_proba(X)[0][1]
-    pred = int(prob >= THRESHOLD)
+    response = runtime.invoke_endpoint(
+        EndpointName=ENDPOINT_NAME,
+        ContentType="text/plain",
+        Body=content.encode("utf-8")
+    )
 
-    return pred, prob
+    result = json.loads(response["Body"].read().decode())
+    return result["prediction"], result["confidence"]
 
 def main():
-    vectorizer, model = load_model()
+    violations = []
 
-    findings = []
-
-    for root, _, files in os.walk(REPO_DIR):
+    for root, _, files in os.walk(os.getcwd()):
         for name in files:
             if name.endswith((".py", ".tf", ".yml", ".yaml", ".txt", ".json")):
                 path = os.path.join(root, name)
-                pred, prob = scan_file(path, vectorizer, model)
 
-                print(f"➡️ {path} | confidence={prob:.3f}")
+                pred, conf = scan_file(path)
+                print(f"➡️ {path} | confidence={conf:.3f}")
 
-                if pred == 1:
-                    findings.append({
+                if pred == 1 and conf >= THRESHOLD:
+                    violations.append({
                         "file": path,
-                        "confidence": prob
+                        "confidence": conf
                     })
 
-    if findings:
+    if violations:
         print("\n🚨 SECURITY VIOLATION DETECTED 🚨")
-        print(json.dumps(findings, indent=2))
+        print(json.dumps(violations, indent=2))
         sys.exit(1)
 
     print("\n✅ No credentials detected")
