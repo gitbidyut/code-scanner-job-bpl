@@ -28,7 +28,8 @@ for root, _, files in os.walk("."):
               result = scan_text(f.read())
               if result.get("credential_found"):
                 violations.append(path)
-
+for text in violations:
+    print(text)
 if violations:
     print("❌ Credential(s) detected:")
     for v in violations:
