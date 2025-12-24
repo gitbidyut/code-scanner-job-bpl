@@ -36,7 +36,7 @@ variable "inference_source_s3" {
 
 variable "model_artifact_s3" {
   description = "S3 path to trained model"
-  default= "s3://ml-training-bucket-bpl/output/file-scanner-1766479400/output/model.tar.gz"
+  default= "s3://ml-training-bucket-bpl/output/file-scanner-1766507690/output/model.tar.gz"
 }
 
 variable "sklearn_image_uri" {

@@ -1,118 +1,57 @@
 import os
 import sys
 import json
-import re
-import boto3
+import joblib
 
-# -----------------------------
-# Configuration
-# -----------------------------
-ENDPOINT_NAME = os.environ.get(
-    "SAGEMAKER_ENDPOINT_NAME",
-    "credential-scanner-endpoint"
-)
+MODEL_DIR = "/opt/ml/model" if os.path.exists("/opt/ml/model") else "./model"
+REPO_DIR = os.getcwd()   # CodeBuild working directory
+THRESHOLD = 0.80
 
-CONFIDENCE_THRESHOLD = 0.85
+print("🔍 Starting credential scan...")
+print(f"📂 Scanning directory: {REPO_DIR}")
 
-IGNORED_EXTENSIONS = {
-    ".tf",
-    ".tfvars",
-    ".yml",
-    ".yaml",
-    ".json",
-    ".md",
-    ".txt",
-    ".ini",
-    ".cfg",
-    ".requirements"
-}
+def load_model():
+    print("📦 Loading model...")
+    vectorizer = joblib.load(os.path.join(MODEL_DIR, "vectorizer.joblib"))
+    model = joblib.load(os.path.join(MODEL_DIR, "model.joblib"))
+    return vectorizer, model
 
-MAX_FILE_SIZE = 200_000  # 200 KB safety limit
+def scan_file(filepath, vectorizer, model):
+    with open(filepath, "r", errors="ignore") as f:
+        content = f.read()
 
-# Real credential patterns (cheap & precise)
-SUSPICIOUS_PATTERNS = [
-    r"AKIA[0-9A-Z]{16}",                      # AWS access key
-    r"ASIA[0-9A-Z]{16}",                      # AWS STS key
-    r"(?i)aws_secret_access_key\s*=\s*['\"][^'\"]+['\"]",
-    r"(?i)aws_access_key_id\s*=\s*['\"][^'\"]+['\"]",
-    r"(?i)secret[_\- ]?key\s*=\s*['\"][^'\"]+['\"]",
-    r"(?i)password\s*=\s*['\"][^'\"]+['\"]",
-]
+    X = vectorizer.transform([content])
+    prob = model.predict_proba(X)[0][1]
+    pred = int(prob >= THRESHOLD)
 
+    return pred, prob
 
-# -----------------------------
-# Helpers
-# -----------------------------
-def looks_like_real_secret(text: str) -> bool:
-    return any(re.search(p, text) for p in SUSPICIOUS_PATTERNS)
-
-
-def should_skip_file(path: str) -> bool:
-    ext = os.path.splitext(path)[1].lower()
-    return ext in IGNORED_EXTENSIONS
-
-
-def invoke_endpoint(client, text: str) -> dict:
-    response = client.invoke_endpoint(
-        EndpointName=ENDPOINT_NAME,
-        ContentType="application/json",
-        Body=json.dumps({"text": text}),
-    )
-    return json.loads(response["Body"].read())
-
-
-# -----------------------------
-# Main scan logic
-# -----------------------------
 def main():
-    print("Starting credential scan...")
+    vectorizer, model = load_model()
 
-    sm_runtime = boto3.client("sagemaker-runtime")
-    violations = []
+    findings = []
 
-    for root, _, files in os.walk("."):
+    for root, _, files in os.walk(REPO_DIR):
         for name in files:
-            path = os.path.join(root, name)
+            if name.endswith((".py", ".tf", ".yml", ".yaml", ".txt", ".json")):
+                path = os.path.join(root, name)
+                pred, prob = scan_file(path, vectorizer, model)
 
-            # if should_skip_file(path):
-            #     print(f"Skipping {path} (safe extension)")
-            #     continue
+                print(f"➡️ {path} | confidence={prob:.3f}")
 
-            try:
-                if os.path.getsize(path) > MAX_FILE_SIZE:
-                    print(f"ℹ️ Skipping {path} (file too large)")
-                    continue
+                if pred == 1:
+                    findings.append({
+                        "file": path,
+                        "confidence": prob
+                    })
 
-                with open(path, "r", errors="ignore") as f:
-                    content = f.read()
-
-            except Exception as e:
-                print(f"⚠️ Could not read {path}: {e}")
-                continue
-
-            # Cheap regex gate
-            if not looks_like_real_secret(content):
-                continue
-
-            # Call ML model only when needed
-            result = invoke_endpoint(sm_runtime, content)
-
-            if (
-                result.get("credential_found")
-                and result.get("confidence", 0) >= CONFIDENCE_THRESHOLD
-            ):
-                print(f"❌ Credential detected in {path}")
-                violations.append({
-                    "file": path,
-                    "type": result.get("type", "unknown"),
-                    "confidence": result.get("confidence"),
-                })
-
-    if violations:
+    if findings:
         print("\n🚨 SECURITY VIOLATION DETECTED 🚨")
-        for v in violations:
-            print(
-                f"- File: {v['file']}, "
-                f"Type: {v['type']}, "
-                f"Confidence: {v['confidence']}"
-            )
+        print(json.dumps(findings, indent=2))
+        sys.exit(1)
+
+    print("\n✅ No credentials detected")
+    sys.exit(0)
+
+if __name__ == "__main__":
+    main()
