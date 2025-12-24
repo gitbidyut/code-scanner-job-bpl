@@ -10,8 +10,9 @@ ENDPOINT = "credential-scanner-endpoint"
 def scan_text(text):
     response = runtime.invoke_endpoint(
     EndpointName=ENDPOINT,
-    ContentType="application/json",
-    Body=json.dumps({"text": text})
+    ContentType="application/octet-stream",
+    Accept="application/json",
+    Body=content.encode("utf-8")
     )
     return json.loads(response["Body"].read())
 
