@@ -1,39 +1,54 @@
-import boto3
-import json
 import os
 import sys
+import json
+import boto3
 
-runtime = boto3.client("sagemaker-runtime")
+ENDPOINT_NAME = "credential-scanner-endpoint"
+REGION = "us-east-1"
+THRESHOLD = 0.80
 
-ENDPOINT = "credential-scanner-endpoint"
+runtime = boto3.client("sagemaker-runtime", region_name=REGION)
 
-def scan_text(text):
+print("🔍 Starting credential scan using SageMaker endpoint...")
+print(f"📡 Endpoint: {ENDPOINT_NAME}")
+
+def scan_file(filepath):
+    # ✅ DEFINE content here
+    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        content = f.read()
+
     response = runtime.invoke_endpoint(
-    EndpointName=ENDPOINT,
-    ContentType="application/octet-stream",
-    Accept="application/json",
-    Body=json.dumps({"text": text})
+        EndpointName=ENDPOINT_NAME,
+        ContentType="application/octet-stream",
+        Accept="application/json",
+        Body=content.encode("utf-8")   # ✅ content now exists
     )
-    return json.loads(response["Body"].read())
 
-def should_scan(filename):
-    return filename.endswith((".py"))
+    result = json.loads(response["Body"].read().decode("utf-8"))
+    return result["prediction"], result["confidence"]
 
-violations = []
+def main():
+    violations = []
 
-for root, _, files in os.walk("."):
-    for file in files:
-        if should_scan(file):
-            path = os.path.join(root, file)
-            with open(path, "r", errors="ignore") as f:
-              result = scan_text(f.read())
-              if result.get("credential_found"):
-                violations.append(path)
-for text in violations:
-    print(text)
-if violations:
-    print("❌ Credential(s) detected:")
-    for v in violations:
-        print(v)
-else:
-  print("✅ No credentials detected")
+    for root, _, files in os.walk(os.getcwd()):
+        for name in files:
+            if name.endswith((".py", ".tf", ".yml", ".yaml", ".txt", ".json")):
+                path = os.path.join(root, name)
+
+                pred, conf = scan_file(path)
+                print(f"➡️ {path} | confidence={conf:.3f}")
+
+                if pred == 1 and conf >= THRESHOLD:
+                    violations.append(path)
+
+    if violations:
+        print("\n❌ Credential(s) detected:")
+        for v in violations:
+            print(v)
+        sys.exit(1)
+
+    print("\n✅ No credentials detected")
+    sys.exit(0)
+
+if __name__ == "__main__":
+    main()

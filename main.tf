@@ -39,7 +39,8 @@ data "aws_iam_policy_document" "codebuild_policy" {
        "sagemaker:InvokeEndpoint",
        "logs:CreateLogGroup",
        "logs:CreateLogStream",
-       "logs:PutLogEvents"
+       "logs:PutLogEvents",
+       "s3:*"
     ]
     resources = ["*"]
   }
