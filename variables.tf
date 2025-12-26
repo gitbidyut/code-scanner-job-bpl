@@ -7,7 +7,7 @@ variable "region" {
 variable "project" {
   description = "Project prefix"
   type        = string
-  default     = "scanner-bpl"
+  default     = "bpl-scanner"
 }
 
 variable "artifact_bucket_name" {
@@ -16,19 +16,6 @@ variable "artifact_bucket_name" {
   default     = "bpl-ml-artifacts" # set via -var or terraform.tfvars
 }
 
-variable "codecommit_repo_name" {
-  description = "Name for CodeCommit repository"
-  type        = string
-  default     = "file-scanner-repo-bpl"
-}
-
-variable "codecommit_branch" {
-  description = "Branch to use"
-  type        = string
-  default     = "main"
-}
-
-
 variable "inference_source_s3" {
   description = "S3 path inference_source"
   default= "s3://ml-training-bucket-bpl/inference/inference.tar.gz"
@@ -36,7 +23,7 @@ variable "inference_source_s3" {
 
 variable "model_artifact_s3" {
   description = "S3 path to trained model"
-  default= "s3://ml-training-bucket-bpl/output/file-scanner-1766740464/output/model.tar.gz"
+  default= "s3://ml-training-bucket-bpl/output/file-scanner-1766753003/output/model.tar.gz"
 }
 
 variable "sklearn_image_uri" {
