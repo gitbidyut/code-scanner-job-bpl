@@ -106,7 +106,7 @@ resource "aws_codebuild_project" "scan" {
 
 resource "aws_codepipeline" "code_scan" {
   name     = "code-scan-pipeline"
-  role_arn = "arn:aws:iam::361509912577:role/scanner-bpl-codepipeline-role"
+  role_arn = "arn:aws:iam::361509912577:role/bpl-training-codepipeline-role"
 
   artifact_store {
     location = var.artifact_bucket_name
