@@ -58,7 +58,14 @@ module "disable_access_key_lambda" {
   region      = "us-east-1"
 }
 
-
+resource "aws_sns_topic" "security_alerts" {
+  name = "credential-scan-alerts-bpl"
+}
+resource "aws_sns_topic_subscription" "email_alert" {
+  topic_arn = aws_sns_topic.security_alerts.arn
+  protocol  = "email"
+  endpoint  = "bidyut.pal@edifixio.com"
+}
 resource "aws_sagemaker_model" "scanner" {
   name               = "credential-scanner-model-v1"
   execution_role_arn = var.sagemaker_execution_role
