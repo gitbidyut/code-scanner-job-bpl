@@ -70,7 +70,7 @@ def invoke_remediation(access_key_id, file_path):
     )
 
     print(f"🔒 Remediation triggered for key: {access_key_id}")
-
+    return access_key_id, file_path
 
 def scan_file(filepath):
     with open(filepath, "r", encoding="utf-8", errors="replace") as f:
@@ -117,10 +117,10 @@ def main():
             if pred == 1 and conf >= THRESHOLD:
                 print(f"❌ Credential detected in {path}")
 
-                invoke_remediation(access_key_id, path)
+                access_key_id, file_path=invoke_remediation(access_key_id, path)
 
                 violations.append({
-                    "file": path,
+                    "file": file_path,
                     "access_key": access_key_id,
                     "confidence": conf
                 })
