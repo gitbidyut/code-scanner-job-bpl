@@ -2,7 +2,7 @@ import boto3
 
 # Hardcoded credentials - DANGEROUS PRACTICE
 AWS_ACCESS_KEY = "AKIAVIK5LQAA25XAFVWT"
-AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+AWS_SECRET_ACCESS_KEY="abcd1234abcd1234abcd1234abcd1234"
 AWS_REGION = "us-east-1"
 
 def list_s3_buckets():
