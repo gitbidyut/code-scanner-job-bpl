@@ -40,7 +40,8 @@ data "aws_iam_policy_document" "codebuild_policy" {
        "logs:CreateLogGroup",
        "logs:CreateLogStream",
        "logs:PutLogEvents",
-       "s3:*"
+       "s3:*",
+       "lambda:InvokeFunction"
     ]
     resources = ["*"]
   }
@@ -50,6 +51,13 @@ resource "aws_iam_role_policy" "codebuild_policy_attach" {
   role   = aws_iam_role.codebuild_role.id
   policy = data.aws_iam_policy_document.codebuild_policy.json
 }
+module "disable_access_key_lambda" {
+  source = "../module/lambda"
+
+  lambda_name = "lambda_function"
+  region      = "us-east-1"
+}
+
 
 resource "aws_sagemaker_model" "scanner" {
   name               = "credential-scanner-model-v1"
