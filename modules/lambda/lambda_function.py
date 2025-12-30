@@ -42,15 +42,15 @@ def lambda_handler(event, context):
         print(f"Access key not found: {access_key_id}")
         return {"status": "not_found"}
     
-    print(f"Disabled access key {access_key_id} for user {username}")
+    print(f"Disabling access key {access_key_id} for user {username}")
     
-    # iam.update_access_key(
-    #     UserName=username,
-    #     AccessKeyId=access_key_id,
-    #     Status="Inactive"
-    #)
+    iam.update_access_key(
+        UserName=username,
+        AccessKeyId=access_key_id,
+        Status="Inactive"
+    )
 
-    print(f"Disabled access key {access_key_id} for user {username}")
+    
     alert = {
         "status": "DISABLED",
         "user": username,
@@ -58,7 +58,7 @@ def lambda_handler(event, context):
         "source_file": source_file
     }
 
-    print(alert)
+    #print(alert)
     send_alert(alert)
 
     return alert

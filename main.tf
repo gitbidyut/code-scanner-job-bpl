@@ -17,20 +17,6 @@ resource "aws_iam_role" "codebuild_role" {
   assume_role_policy = data.aws_iam_policy_document.codebuild_assume.json
 }
 
-# Inline policy for CodeBuild to call SageMaker, S3, Logs, ECR (if needed)
-# data "aws_iam_policy_document" "codebuild_policy" {
-#   statement {
-#     sid    = "SageMakerS3Logs"
-#     effect = "Allow"
-#     actions = [ 
-#       "sagemaker:InvokeEndpoint",
-#        "logs:CreateLogGroup",
-#        "logs:CreateLogStream",
-#        "logs:PutLogEvents"
-#     ]   
-#     resources = "*"
-#   }
-# }
 data "aws_iam_policy_document" "codebuild_policy" {
   statement {
     sid    = "SageMakerS3Logs"
