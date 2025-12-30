@@ -5,7 +5,14 @@ import json
 iam = boto3.client("iam")
 sns = boto3.client("sns")
 
-SNS_TOPIC_ARN = "arn:aws:sns:us-east-1:361509912577:credential-scan-alerts-bpl"
+def get_topic_arn_by_name(topic_name):
+    sns = boto3.client('sns')
+    # If the topic exists, this returns its ARN. # If not, it creates it and returns the ARN.
+    response = sns.create_topic(Name=topic_name)
+    return response['TopicArn']
+
+# Usage
+SNS_TOPIC_ARN = get_topic_arn_by_name('credential-scan-alerts-bpl')
 
 def send_alert(message):
     if not SNS_TOPIC_ARN:

@@ -39,9 +39,8 @@ resource "aws_iam_role_policy" "codebuild_policy_attach" {
 }
 module "disable_access_key_lambda" {
   source = "./modules/lambda"
-
-  lambda_name = "lambda_function"
-  region      = "us-east-1"
+  lambda_name = var.lambda_name
+  
 }
 
 resource "aws_sns_topic" "security_alerts" {

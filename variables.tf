@@ -3,6 +3,12 @@ variable "region" {
   type        = string
   default     = "us-east-1"
 }
+variable "lambda_name" {
+  description = "Lambda function name"
+  type        = string
+  default     = "lambda_scanning-function"
+}
+
 
 variable "project" {
   description = "Project prefix"
