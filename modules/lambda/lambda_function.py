@@ -5,8 +5,7 @@ import json
 iam = boto3.client("iam")
 sns = boto3.client("sns")
 
-SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN")
-
+SNS_TOPIC_ARN = "arn:aws:sns:us-east-1:361509912577:credential-scan-alerts-bpl"
 
 def send_alert(message):
     if not SNS_TOPIC_ARN:
@@ -33,7 +32,7 @@ def get_username_from_access_key(access_key_id):
 
 def lambda_handler(event, context):
     access_key_id = event.get("access_key_id")
-    source_file= event.get("file_path")
+    source_file= event.get("source_file")
     if not access_key_id:
         raise ValueError("access_key_id missing in event")
 
@@ -68,3 +67,4 @@ def lambda_handler(event, context):
     #     "user": username,
     #     "access_key": access_key_id
     # }
+
