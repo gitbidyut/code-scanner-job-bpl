@@ -8,7 +8,7 @@ import boto3
 # Configuration
 # =========================
 ENDPOINT_NAME = "credential-scanner-endpoint"
-LAMBDA_NAME = "disable-access-key-bpl"
+LAMBDA_NAME = "lambda_function"
 REGION = "us-east-1"
 THRESHOLD = 0.80
 
@@ -136,3 +136,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
