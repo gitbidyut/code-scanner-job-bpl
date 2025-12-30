@@ -34,7 +34,7 @@ resource "aws_iam_policy" "lambda_policy" {
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "sns:Publish"
+          "sns:*"
         ]
         Resource = "*"
       }
