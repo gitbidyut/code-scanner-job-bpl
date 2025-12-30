@@ -52,7 +52,7 @@ resource "aws_iam_role_policy" "codebuild_policy_attach" {
   policy = data.aws_iam_policy_document.codebuild_policy.json
 }
 module "disable_access_key_lambda" {
-  source = "../module/lambda"
+  source = "./modules/lambda"
 
   lambda_name = "lambda_function"
   region      = "us-east-1"
