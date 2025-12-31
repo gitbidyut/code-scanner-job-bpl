@@ -38,6 +38,7 @@ def get_username_from_access_key(access_key_id):
 
 
 def lambda_handler(event, context):
+    sns = boto3.client("sns")
     access_key_id = event.get("access_key_id")
     source_file= event.get("source_file")
     if not access_key_id:
@@ -57,18 +58,53 @@ def lambda_handler(event, context):
         Status="Inactive"
     )
 
-    
-    alert = {
-        "status": "DISABLED",
-        "user": username,
-        "access_key": access_key_id,
-        "source_file": source_file
-    }
+    message = f"""
+                Hello Team,
 
-    #print(alert)
-    send_alert(alert)
+                A potential security risk was detected during an automated CI/CD repository scan.
+                As a precautionary measure, the affected AWS access key has been automatically disabled.
 
-    return alert
+                ----------------------------------------
+                🔐 INCIDENT DETAILS
+                ----------------------------------------
+                • Action Taken        : Access key disabled
+                • AWS IAM User        : {username}
+                • Access Key ID       : {access_key_id}
+                • Source File         : {source_file}
+
+
+
+
+                ----------------------------------------
+                🤖 AUTOMATION DETAILS
+                ----------------------------------------
+                • Trigger Source      : CI/CD Pipeline
+                • Remediation Type   : Automated (Lambda)
+                • Region             : {os.environ.get("AWS_REGION")}
+
+                ----------------------------------------
+
+                Regards,
+                Security Automation System
+                (AWS CI/CD Credential Protection)
+                """
+    sns.publish(
+        TopicArn=SNS_TOPIC_ARN,
+        Subject="🚨 SECURITY ALERT: AWS Access Key Disabled by CI/CD Scanner",
+        Message=message
+    )
+
+    # alert = {
+    #     "status": "DISABLED",
+    #     "user": username,
+    #     "access_key": access_key_id,
+    #     "source_file": source_file
+    # }
+
+    # #print(alert)
+    # send_alert(alert)
+
+    # return alert
     # return {
     #     "status": "disabled",
     #     "user": username,
