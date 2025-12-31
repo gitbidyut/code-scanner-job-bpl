@@ -59,35 +59,32 @@ def lambda_handler(event, context):
     )
 
     message = f"""
-                Hello Team,
+Hello Team,
 
-                A potential security risk was detected during an automated CI/CD repository scan.
-                As a precautionary measure, the affected AWS access key has been automatically disabled.
+A potential security risk was detected by automated CI/CD repository scan.
+As a precautionary measure,The affected AWS access key has been automatically disabled.
 
-                ----------------------------------------
-                🔐 INCIDENT DETAILS
-                ----------------------------------------
-                • Action Taken        : Access key disabled
-                • AWS IAM User        : {username}
-                • Access Key ID       : {access_key_id}
-                • Source File         : {source_file}
-
-
+----------------------------------------
+  🔐 INCIDENT DETAILS
+----------------------------------------
+        • Action Taken        : Access key disabled
+        • AWS IAM User        : {username}
+        • Access Key ID       : {access_key_id}
+        • Source File         : {source_file}
 
 
-                ----------------------------------------
-                🤖 AUTOMATION DETAILS
-                ----------------------------------------
-                • Trigger Source      : CI/CD Pipeline
-                • Remediation Type   : Automated (Lambda)
-                • Region             : {os.environ.get("AWS_REGION")}
+----------------------------------------
+    🤖 AUTOMATION DETAILS
+----------------------------------------
+        • Trigger Source      : CI/CD Pipeline
+        • Remediation Type   : Automated (Lambda)
+        • Region             : {os.environ.get("AWS_REGION")}
+----------------------------------------
 
-                ----------------------------------------
-
-                Regards,
-                Security Automation System
-                (AWS CI/CD Credential Protection)
-                """
+Regards,
+Security Automation System
+(AWS CI/CD Credential Protection)
+"""
     sns.publish(
         TopicArn=SNS_TOPIC_ARN,
         Subject="🚨 SECURITY ALERT: AWS Access Key Disabled by CI/CD Scanner",
